@@ -20,6 +20,10 @@ def get_mnist(train):
                                    train=train,
                                    transform=pre_process,
                                    download=True)
+    if train:
+        print 'mnist_dataset.train_data', mnist_dataset.train_data.shape
+        mnist_dataset.train_data = mnist_dataset.train_data[:2000]
+        mnist_dataset.train_labels = mnist_dataset.train_labels[:2000]
 
     mnist_data_loader = torch.utils.data.DataLoader(
         dataset=mnist_dataset,

@@ -52,12 +52,13 @@ if __name__ == '__main__':
 
     # init weights of target encoder with those of source encoder
     if not tgt_encoder.restored:
+    	print 'Initializaing tgt_encoder with src_encoder'
         tgt_encoder.load_state_dict(src_encoder.state_dict())
 
     if not (tgt_encoder.restored and critic.restored and
             params.tgt_model_trained):
         tgt_encoder = train_tgt(src_encoder, tgt_encoder, critic,
-                                src_data_loader, tgt_data_loader)
+                                src_data_loader, tgt_data_loader, src_classifier, tgt_data_loader_eval)
 
     # eval target encoder on test set of target dataset
     print("=== Evaluating classifier for encoded target domain ===")

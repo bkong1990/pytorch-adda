@@ -55,9 +55,12 @@ class USPS(data.Dataset):
             total_num_samples = self.train_labels.shape[0]
             indices = np.arange(total_num_samples)
             np.random.shuffle(indices)
-            self.train_data = self.train_data[indices[0:self.dataset_size], ::]
-            self.train_labels = self.train_labels[indices[0:self.dataset_size]]
-        self.train_data *= 255.0
+            # self.train_data = self.train_data[indices[0:self.dataset_size], ::]
+            # self.train_labels = self.train_labels[indices[0:self.dataset_size]]
+            self.train_data = self.train_data[indices[0:1800], ::]
+            self.train_labels = self.train_labels[indices[0:1800]]
+            self.dataset_size = 1800
+        #self.train_data *= 255.0
         self.train_data = self.train_data.transpose(
             (0, 2, 3, 1))  # convert to HWC
 
@@ -70,11 +73,12 @@ class USPS(data.Dataset):
             tuple: (image, target) where target is index of the target class.
         """
         img, label = self.train_data[index, ::], self.train_labels[index]
+
         if self.transform is not None:
-            img = self.transform(img)
+            img_final = self.transform(img.copy())
         label = torch.LongTensor([np.int64(label).item()])
         # label = torch.FloatTensor([label.item()])
-        return img, label
+        return img_final, label
 
     def __len__(self):
         """Return size of dataset."""
@@ -93,7 +97,7 @@ class USPS(data.Dataset):
         if os.path.isfile(filename):
             return
         print("Download %s to %s" % (self.url, os.path.abspath(filename)))
-        urllib.request.urlretrieve(self.url, filename)
+        urllib.urlretrieve(self.url, filename)
         print("[DONE]")
         return
 
@@ -101,7 +105,7 @@ class USPS(data.Dataset):
         """Load sample images from dataset."""
         filename = os.path.join(self.root, self.filename)
         f = gzip.open(filename, "rb")
-        data_set = pickle.load(f, encoding="bytes")
+        data_set = pickle.load(f)
         f.close()
         if self.train:
             images = data_set[0][0]

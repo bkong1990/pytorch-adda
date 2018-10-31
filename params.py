@@ -6,7 +6,7 @@ dataset_mean_value = 0.5
 dataset_std_value = 0.5
 dataset_mean = (dataset_mean_value, dataset_mean_value, dataset_mean_value)
 dataset_std = (dataset_std_value, dataset_std_value, dataset_std_value)
-batch_size = 50
+batch_size = 128
 image_size = 64
 
 # params for source dataset
@@ -29,12 +29,12 @@ d_model_restore = "snapshots/ADDA-critic-final.pt"
 
 # params for training network
 num_gpu = 1
-num_epochs_pre = 100
+num_epochs_pre = 30 #100
 log_step_pre = 20
-eval_step_pre = 20
+eval_step_pre = 10 # 20
 save_step_pre = 100
-num_epochs = 2000
-log_step = 100
+num_epochs = 200#1000
+log_step = 20 # 100
 save_step = 100
 manual_seed = None
 
