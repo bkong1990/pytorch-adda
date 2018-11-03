@@ -1,14 +1,15 @@
 """Utilities for ADDA."""
-
+import datetime
 import os
 import random
+import logging
 
 import torch
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
 
 import params
-from datasets import get_mnist, get_usps
+from datasets import get_mnist, get_usps, get_refuge
 
 
 def make_variable(tensor, volatile=False):
@@ -61,12 +62,16 @@ def get_data_loader(name, train=True):
         return get_mnist(train)
     elif name == "USPS":
         return get_usps(train)
+    elif name == "REFUGE_SRC":
+        return get_refuge(train, name)
+    elif name == "REFUGE_DST":
+        return get_refuge(train, name)
 
 
 def init_model(net, restore):
     """Init models with cuda and weights."""
     # init weights of model
-    net.apply(init_weights)
+    # net.apply(init_weights)
 
     # restore model weights
     if restore is not None and os.path.exists(restore):
@@ -82,11 +87,25 @@ def init_model(net, restore):
     return net
 
 
-def save_model(net, filename):
+def save_model(net, filename, logger):
     """Save trained model."""
     if not os.path.exists(params.model_root):
         os.makedirs(params.model_root)
     torch.save(net.state_dict(),
                os.path.join(params.model_root, filename))
-    print("save pretrained model to: {}".format(os.path.join(params.model_root,
+    logger.info("save pretrained model to: {}".format(os.path.join(params.model_root,
                                                              filename)))
+
+def get_logger(logdir):
+    if not os.path.exists(logdir):
+        os.makedirs(logdir)
+    logger = logging.getLogger('ptsemseg')
+    ts = str(datetime.datetime.now()).split('.')[0].replace(" ", "_")
+    ts = ts.replace(":", "_").replace("-","_")
+    file_path = os.path.join(logdir, 'run_{}.log'.format(ts))
+    hdlr = logging.FileHandler(file_path)
+    formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+    hdlr.setFormatter(formatter)
+    logger.addHandler(hdlr) 
+    logger.setLevel(logging.INFO)
+    return logger

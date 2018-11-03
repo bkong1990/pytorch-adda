@@ -168,8 +168,16 @@ from utils import make_variable
 from .test import eval_tgt
 
 
-def train_tgt(src_encoder, tgt_encoder, critic,
-              src_data_loader, tgt_data_loader, src_classifier, tgt_data_loader_eval):
+def train_tgt(
+        src_encoder, 
+        tgt_encoder,
+        critic,
+        src_data_loader, 
+        tgt_data_loader, 
+        src_classifier, 
+        tgt_data_loader_eval, 
+        logger
+    ):
     """Train encoder for target domain."""
     ####################
     # 1. setup network #
@@ -196,7 +204,7 @@ def train_tgt(src_encoder, tgt_encoder, critic,
     for epoch in range(params.num_epochs):
         # zip source and target data pair
         data_zip = enumerate(zip(src_data_loader, tgt_data_loader))
-        for step, ((images_src, _), (images_tgt, _)) in data_zip:
+        for step, ((images_src, _, _), (images_tgt, _, _)) in data_zip:
             ###########################
             # 2.1 train discriminator #
             ###########################
@@ -259,6 +267,15 @@ def train_tgt(src_encoder, tgt_encoder, critic,
             # 2.3 print step info #
             #######################
             if ((step + 1) % params.log_step == 0):
+                logger.info("Epoch [{}/{}] Step [{}/{}]:"
+                      "d_loss={:.5f} g_loss={:.5f} acc={:.5f}"
+                      .format(epoch + 1,
+                              params.num_epochs,
+                              step + 1,
+                              len_data_loader,
+                              loss_critic.data[0],
+                              loss_tgt.data[0],
+                              acc.data[0]))
                 print("Epoch [{}/{}] Step [{}/{}]:"
                       "d_loss={:.5f} g_loss={:.5f} acc={:.5f}"
                       .format(epoch + 1,
@@ -279,8 +296,8 @@ def train_tgt(src_encoder, tgt_encoder, critic,
             torch.save(tgt_encoder.state_dict(), os.path.join(
                 params.model_root,
                 "ADDA-target-encoder-{}.pt".format(epoch + 1)))
-        if ((epoch + 1) % 10 == 0):
-            eval_tgt(tgt_encoder, src_classifier, tgt_data_loader_eval)
+        if ((epoch + 1) % 5 == 0):
+            eval_tgt(tgt_encoder, src_classifier, tgt_data_loader_eval, logger)
 
     torch.save(critic.state_dict(), os.path.join(
         params.model_root,

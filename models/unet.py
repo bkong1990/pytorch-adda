@@ -1,31 +1,6 @@
-"""Discriminator model for ADDA."""
-
+import torch.nn.functional as F
 from torch import nn
-
-
-class Discriminator(nn.Module):
-    """Discriminator model for source domain."""
-
-    def __init__(self, input_dims, hidden_dims, output_dims):
-        """Init discriminator."""
-        super(Discriminator, self).__init__()
-
-        self.restored = False
-
-        self.layer = nn.Sequential(
-            nn.Linear(input_dims, hidden_dims),
-            nn.ReLU(),
-            nn.Linear(hidden_dims, hidden_dims),
-            nn.ReLU(),
-            nn.Linear(hidden_dims, output_dims),
-            nn.LogSoftmax()
-        )
-
-    def forward(self, input):
-        """Forward the discriminator."""
-        out = self.layer(input)
-        return out
-
+import torch
 
 class unetConv2(nn.Module):
     def __init__(self, in_size, out_size, is_batchnorm):
@@ -33,19 +8,19 @@ class unetConv2(nn.Module):
 
         if is_batchnorm:
             self.conv1 = nn.Sequential(
-                nn.Conv2d(in_size, out_size, 3, 1, 0),
+                nn.Conv2d(in_size, out_size, 3, 1, 1),
                 nn.BatchNorm2d(out_size),
                 nn.ReLU(),
             )
             self.conv2 = nn.Sequential(
-                nn.Conv2d(out_size, out_size, 3, 1, 0),
+                nn.Conv2d(out_size, out_size, 3, 1, 1),
                 nn.BatchNorm2d(out_size),
                 nn.ReLU(),
             )
         else:
-            self.conv1 = nn.Sequential(nn.Conv2d(in_size, out_size, 3, 1, 0), nn.ReLU())
+            self.conv1 = nn.Sequential(nn.Conv2d(in_size, out_size, 3, 1, 1), nn.ReLU())
             self.conv2 = nn.Sequential(
-                nn.Conv2d(out_size, out_size, 3, 1, 0), nn.ReLU()
+                nn.Conv2d(out_size, out_size, 3, 1, 1), nn.ReLU()
             )
 
     def forward(self, inputs):
@@ -53,7 +28,23 @@ class unetConv2(nn.Module):
         outputs = self.conv2(outputs)
         return outputs
 
-class Discriminator1(nn.Module):
+class unetUp(nn.Module):
+    def __init__(self, in_size, out_size, is_deconv):
+        super(unetUp, self).__init__()
+        self.conv = unetConv2(in_size, out_size, False)
+        if is_deconv:
+            self.up = nn.ConvTranspose2d(in_size, out_size, kernel_size=2, stride=2)
+        else:
+            self.up = nn.UpsamplingBilinear2d(scale_factor=2)
+
+    def forward(self, inputs1, inputs2):
+        outputs2 = self.up(inputs2)
+        offset = outputs2.size()[2] - inputs1.size()[2]
+        padding = 2 * [offset // 2, offset // 2]
+        outputs1 = F.pad(inputs1, padding)
+        return self.conv(torch.cat([outputs1, outputs2], 1))
+
+class UNet(nn.Module):
     def __init__(
         self,
         feature_scale=4,
@@ -62,15 +53,14 @@ class Discriminator1(nn.Module):
         in_channels=3,
         is_batchnorm=True,
     ):
-        super(Discriminator1, self).__init__()
+        super(UNet, self).__init__()
         self.is_deconv = is_deconv
         self.in_channels = in_channels
         self.is_batchnorm = is_batchnorm
         self.feature_scale = feature_scale
         self.restored = False
 
-        #filters = [64, 128, 256, 512, 256]
-        filters = [32, 64, 128, 128, 128]
+        filters = [64, 128, 256, 512, 1024]
         filters = [int(x / self.feature_scale) for x in filters]
 
         # downsampling
@@ -88,8 +78,14 @@ class Discriminator1(nn.Module):
 
         self.center = unetConv2(filters[3], filters[4], self.is_batchnorm)
 
+        # upsampling
+        self.up_concat4 = unetUp(filters[4], filters[3], self.is_deconv)
+        self.up_concat3 = unetUp(filters[3], filters[2], self.is_deconv)
+        self.up_concat2 = unetUp(filters[2], filters[1], self.is_deconv)
+        self.up_concat1 = unetUp(filters[1], filters[0], self.is_deconv)
+
         # final conv (without any concat)
-        self.fc = nn.Linear(32 * 24 * 24, n_classes)
+        self.final = nn.Conv2d(filters[0], n_classes, 1, 1)
 
     def forward(self, inputs):
         conv1 = self.conv1(inputs)
@@ -105,9 +101,21 @@ class Discriminator1(nn.Module):
         maxpool4 = self.maxpool4(conv4)
 
         center = self.center(maxpool4)
-        # print 'center: ', center.shape
+        up4 = self.up_concat4(conv4, center)
+        # print 'up4: ', up4.shape, center.shape, conv4.shape
+        # print conv1.shape, maxpool1.shape, conv2.shape, maxpool2.shape, conv3.shape, maxpool3.shape, conv4.shape, maxpool4.shape
+        up3 = self.up_concat3(conv3, up4)
+        up2 = self.up_concat2(conv2, up3)
+        up1 = self.up_concat1(conv1, up2)
 
-        center = center.view(center.size(0), -1)
-        center = self.fc(center)
+        final = self.final(up1)
 
-        return center
+        return final
+
+
+class VoidDiscriminator(nn.Module):
+    def __init__(self):
+        super(VoidDiscriminator, self).__init__()
+
+    def forward(self, inputs):
+        return inputs
